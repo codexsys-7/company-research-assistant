@@ -22,7 +22,6 @@ AI-powered pre-interview research tool. Takes company name → autonomously rese
 ## Environment Variables
 
 ```
-<!-- GOOGLE_API_KEY=AIzaSyBLjFU6PZG9hZK_MYFQEU9ADqseMCyBdUg  (deprecated - switched to OpenAI) -->
 OPENAI_API_KEY=<.env>
 CHROMA_PERSIST_DIR=./chroma_db
 BACKEND_PORT=8000
@@ -71,11 +70,15 @@ focus on developer experience.
 - POST /research endpoint tested via curl - all queries returning correct answers
 -->
 
-**Phase 2:** Live Web Search (Day 2)
-
-- DuckDuckGo integration
-- 4 search query templates (news, culture, tech, interviews)
-- Dynamic embedding of real web data
+<!-- **Phase 2:** Live Web Search (Day 2) COMPLETED Feb 25, 2026
+- DuckDuckGo integration (ddgs library, 4 query templates: news, culture, tech, interviews)
+- process_results() deduplication + title+snippet cleaning
+- embed_search_results() chunks at 250 words, upserts to ChromaDB with {company, source} metadata
+- clear_collection() called before each research request to flush stale data
+- /research endpoint: clear -> search_company -> process_results -> embed -> retrieve -> LLM -> JSON
+- Returns: answer, company, query, sources_found, chunks_embedded
+- Tested: OpenAI (20 sources, 20 chunks), Airbnb (20 sources, 20 chunks) - both returning live answers
+-->
 
 **Phase 3:** LangGraph Agents (Day 3)
 
@@ -110,19 +113,15 @@ focus on developer experience.
 
 **Phase 1:** Foundation & Basic RAG — COMPLETED Feb 24, 2026
 
-- FastAPI server running on port 8000 with `/health` and `/research` endpoints
-- ChromaDB + Sentence Transformers (`all-MiniLM-L6-v2`) embeddings working
-- RAG retrieval pipeline (`retriever.py`) returning top-3 relevant chunks
-- OpenAI `gpt-4o-mini` synthesizing answers via `report_chain.py`
-- End-to-end curl tests passed for location, founders, and payment services queries
+**Phase 2:** Live Web Search (Day 2) COMPLETED Feb 25, 2026
 
 ## 🔄 Current Phase
 
-**Phase 2:** Live Web Search (Feb 25, 2026)
+**Phase 3:** LangGraph Agents (Feb 26, 2026)
 
 **Next immediate steps:**
 
-- Create `backend/search/duckduckgo_client.py`
-- Implement 4 search query templates (news, culture, tech, interviews)
-- Dynamically embed real web search results into ChromaDB
-- Wire into `/research` endpoint so any company can be researched live
+- Create `backend/agents/research_graph.py`
+- 4 parallel research nodes (news, culture, tech, interviews)
+- State management with LangGraph
+- Agent graph execution wired into `/research` endpoint
