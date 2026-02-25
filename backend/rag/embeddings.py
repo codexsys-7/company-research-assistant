@@ -48,46 +48,6 @@ CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
 _client = None
 _collection = None
 
-# ---------------------------------------------------------------------------
-# Hardcoded Stripe data for Phase 1 testing
-# ---------------------------------------------------------------------------
-STRIPE_DATA = """
-Stripe is a financial infrastructure platform for businesses of all sizes. Founded in 2010 \
-by brothers Patrick Collison and John Collison, the company was born out of a simple \
-observation: accepting payments on the internet was far too difficult for most businesses. \
-Starting from a small San Francisco apartment, Stripe quickly gained traction among developers \
-for its clean, intuitive APIs and comprehensive documentation. Today, Stripe processes hundreds \
-of billions of dollars in payments annually and serves millions of businesses in over 100 \
-countries, ranging from small startups to large public enterprises such as Amazon, Google, \
-and Salesforce.
-
-Stripe's product portfolio has expanded well beyond basic payment processing. Its core \
-offering, Stripe Payments, supports over 135 currencies and dozens of payment methods \
-including cards, bank transfers, and local payment schemes. Stripe Billing handles recurring \
-revenue and subscription management for SaaS businesses. Stripe Connect powers marketplace \
-and platform businesses by routing funds between multiple parties. Stripe Terminal extends \
-payment acceptance to physical retail with programmable card readers. Additional products \
-include Stripe Radar for machine-learning-based fraud detection, Stripe Issuing for creating \
-custom debit and credit cards, and Stripe Treasury for embedding financial services directly \
-into software platforms.
-
-On the engineering side, Stripe is known for its polyglot technical culture. The company \
-uses Ruby for many backend services and Scala for high-throughput data pipelines. The \
-frontend is built primarily with React and TypeScript. Data is stored across MongoDB, MySQL, \
-and Redis depending on the use case. Stripe invests heavily in internal developer tooling, \
-including a sophisticated monorepo setup, automated testing infrastructure, and custom \
-deployment systems. The engineering blog regularly publishes deep technical posts covering \
-distributed systems design, compiler optimisations, and reliability engineering.
-
-Stripe consistently ranks among the best engineering workplaces in the world. The company \
-places a high premium on writing — both internal documentation and external communication — \
-believing that clear writing reflects clear thinking. Engineers are encouraged to work on \
-cross-team projects and to approach problems from first principles. The co-founders remain \
-actively involved in technical decisions. Stripe has maintained a private valuation exceeding \
-$50 billion and is widely regarded as one of the most influential fintech companies globally, \
-with a stated mission to increase the GDP of the internet.
-"""
-
 
 def _get_client() -> chromadb.PersistentClient:
     global _client
@@ -121,27 +81,42 @@ def chunk_text(text: str, max_words: int = 250) -> list[str]:
     return chunks
 
 
-def embed_hardcoded_data() -> None:
-    """Chunk and upsert the hardcoded Stripe data into ChromaDB.
+def clear_collection() -> None:
+    """Delete all documents from the collection."""
+    collection = get_collection()
+    result = collection.get(include=[])
+    if result["ids"]:
+        collection.delete(ids=result["ids"])
 
-    Uses upsert so this is safe to call on every import without creating
-    duplicate documents.
+
+def embed_search_results(company_name: str, search_texts: list[str]) -> int:
+    """
+    Chunk each text at 250 words, embed all chunks, and store in ChromaDB
+    with metadata {company, source}.
+
+    Returns the total number of chunks embedded.
     """
     collection = get_collection()
-    chunks = chunk_text(STRIPE_DATA)
-    ids = [f"stripe_chunk_{i}" for i in range(len(chunks))]
-    metadatas = [
-        {"source": "hardcoded", "company": "Stripe", "chunk_index": i}
-        for i in range(len(chunks))
-    ]
-    collection.upsert(documents=chunks, metadatas=metadatas, ids=ids)
+    company_key = company_name.lower().replace(" ", "_")
+    all_chunks = []
+    all_metadatas = []
+    all_ids = []
+
+    chunk_index = 0
+    for text in search_texts:
+        for chunk in chunk_text(text):
+            all_chunks.append(chunk)
+            all_metadatas.append({"company": company_name, "source": "web_search"})
+            all_ids.append(f"{company_key}_chunk_{chunk_index}")
+            chunk_index += 1
+
+    if all_chunks:
+        collection.upsert(documents=all_chunks, metadatas=all_metadatas, ids=all_ids)
+
+    return len(all_chunks)
 
 
 def add_documents(texts: list[str], metadatas: list[dict]) -> None:
     collection = get_collection()
     ids = [f"doc_{i}" for i in range(len(texts))]
     collection.add(documents=texts, metadatas=metadatas, ids=ids)
-
-
-# Embed hardcoded data on module load
-embed_hardcoded_data()
