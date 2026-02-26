@@ -80,17 +80,25 @@ focus on developer experience.
 - Tested: OpenAI (20 sources, 20 chunks), Airbnb (20 sources, 20 chunks) - both returning live answers
 -->
 
-**Phase 3:** LangGraph Agents (Day 3)
-
-- 4 parallel research nodes
-- State management
-- Agent graph execution
+<!-- **Phase 3:** LangGraph Agents (Day 3) COMPLETED Feb 26, 2026
+- ResearchState TypedDict: company_name, news_results, culture_results, tech_results, interview_results, all_results
+- 4 sequential nodes: news_node → culture_node → tech_node → interview_node → aggregator_node
+- Sequential chain (START → news → culture → tech → interview → aggregator → END)
+  - Note: fan-out (parallel) pattern abandoned — curl_cffi (used by ddgs) deadlocks inside LangGraph's thread executor
+- Per-node timing + warning logs if empty results + time.sleep(1) rate-limit buffer between nodes
+- aggregator_node: combines 20 raw results, deduplicates via process_results(), stores in all_results
+- research_graph.py wired into /research endpoint (replaces direct search_company() call)
+- execution_time_s added to /research response
+- Tested: SpaceX, Anthropic, Netflix, bet365 — all returning 20 sources, 20 chunks, correct LLM answers
+- Fake company test (qwertrewq): DuckDuckGo returns unrelated results; LLM correctly says no info found
+-->
 
 **Phase 4:** Structured Reports (Day 4)
 
-- Pydantic report schema
-- /generate-report endpoint
-- /chat endpoint for follow-ups
+- Pydantic report schema (`backend/schemas/report.py`)
+- `/generate-report` endpoint: takes company_name, runs research graph, returns structured JSON report
+- Report sections: summary, tech_stack, culture, interview_tips, recent_news
+- `/chat` endpoint: takes company_name + question, retrieves from ChromaDB, returns RAG answer
 
 **Phase 5:** React Frontend (Day 5)
 
@@ -113,15 +121,16 @@ focus on developer experience.
 
 **Phase 1:** Foundation & Basic RAG — COMPLETED Feb 24, 2026
 
-**Phase 2:** Live Web Search (Day 2) COMPLETED Feb 25, 2026
+**Phase 2:** Live Web Search — COMPLETED Feb 25, 2026
+
+**Phase 3:** LangGraph Agents — COMPLETED Feb 26, 2026
 
 ## 🔄 Current Phase
 
-**Phase 3:** LangGraph Agents (Feb 26, 2026)
+**Phase 4:** Structured Reports (Feb 27, 2026)
 
 **Next immediate steps:**
 
-- Create `backend/agents/research_graph.py`
-- 4 parallel research nodes (news, culture, tech, interviews)
-- State management with LangGraph
-- Agent graph execution wired into `/research` endpoint
+- Create `backend/schemas/report.py` — Pydantic models for structured report output
+- Create `/generate-report` endpoint in `main.py`
+- Create `/chat` endpoint in `main.py` for follow-up RAG queries
