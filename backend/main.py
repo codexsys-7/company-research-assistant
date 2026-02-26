@@ -1,4 +1,5 @@
 import logging
+import time
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +8,7 @@ from pydantic import BaseModel
 from rag.embeddings import clear_collection, embed_search_results
 from rag.retriever import retrieve_context
 from chains.report_chain import answer_query
-from search.duckduckgo_client import search_company, process_results
+from agents.research_graph import build_graph
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,13 @@ def health_check():
     return {"status": "ok"}
 
 
+research_graph = build_graph()
+
+
 @app.post("/research")
 def research(request: ResearchRequest):
+    start_time = time.time()
+
     # 1. Clear stale data
     try:
         clear_collection()
@@ -45,30 +51,36 @@ def research(request: ResearchRequest):
         logger.error("ChromaDB clear failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Vector store error: {e}")
 
-    # 2. Fetch live web results for the company
+    # 2. Run LangGraph agent (parallel news/culture/tech/interview → aggregator)
     try:
-        raw_results = search_company(request.company_name)
+        initial_state = {
+            "company_name": request.company_name,
+            "news_results": [],
+            "culture_results": [],
+            "tech_results": [],
+            "interview_results": [],
+            "all_results": [],
+        }
+        final_state = research_graph.invoke(initial_state)
+        search_texts = final_state["all_results"]
     except Exception as e:
-        logger.error("Web search failed for '%s': %s", request.company_name, e)
-        raise HTTPException(status_code=503, detail=f"Web search error: {e}")
+        logger.error("Agent graph failed for '%s': %s", request.company_name, e)
+        raise HTTPException(status_code=503, detail=f"Research agent error: {e}")
 
-    if not raw_results:
+    if not search_texts:
         raise HTTPException(
             status_code=404,
             detail=f"No web results found for '{request.company_name}'. Check the company name and try again.",
         )
 
-    # 3. Deduplicate and clean
-    search_texts = process_results(raw_results)
-
-    # 4. Embed into ChromaDB
+    # 3. Embed into ChromaDB
     try:
         chunks_embedded = embed_search_results(request.company_name, search_texts)
     except Exception as e:
         logger.error("ChromaDB embed failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Vector store error: {e}")
 
-    # 5. Retrieve relevant context for the query
+    # 4. Retrieve relevant context for the query
     try:
         context = retrieve_context(request.query)
     except Exception as e:
@@ -78,18 +90,21 @@ def research(request: ResearchRequest):
     if not context:
         raise HTTPException(status_code=404, detail="No relevant context found for this query.")
 
-    # 6. Generate answer
+    # 5. Generate answer
     try:
         answer = answer_query(request.query, context)
     except Exception as e:
         logger.error("LLM call failed: %s", e)
         raise HTTPException(status_code=503, detail=f"LLM error: {e}")
 
+    elapsed = round(time.time() - start_time, 2)
+
     return {
         "status": "ok",
         "company": request.company_name,
         "query": request.query,
         "answer": answer,
-        "sources_found": len(raw_results),
+        "sources_found": len(search_texts),
         "chunks_embedded": chunks_embedded,
+        "execution_time_s": elapsed,
     }

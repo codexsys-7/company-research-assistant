@@ -52,26 +52,26 @@
 
 
 
-import requests
+# import requests
 
-BASE = "http://localhost:8000"
+# BASE = "http://localhost:8000"
 
-# Happy-path tests
-for company, query in [
-    ("OpenAI", "What does OpenAI do?"),
-    ("Airbnb", "What is Airbnb's tech stack?"),
-]:
-    print(f"\n--- {company} ---")
-    resp = requests.post(f"{BASE}/research", json={"company_name": company, "query": query})
-    if resp.ok:
-        data = resp.json()
-        print(f"Status         : {data['status']}")
-        print(f"Sources found  : {data['sources_found']}")
-        print(f"Chunks embedded: {data['chunks_embedded']}")
-        print(f"Q: {data['query']}")
-        print(f"A: {data['answer'][:400]}")
-    else:
-        print(f"ERROR {resp.status_code}: {resp.text}")
+# # Happy-path tests
+# for company, query in [
+#     ("OpenAI", "What does OpenAI do?"),
+#     ("Airbnb", "What is Airbnb's tech stack?"),
+# ]:
+#     print(f"\n--- {company} ---")
+#     resp = requests.post(f"{BASE}/research", json={"company_name": company, "query": query})
+#     if resp.ok:
+#         data = resp.json()
+#         print(f"Status         : {data['status']}")
+#         print(f"Sources found  : {data['sources_found']}")
+#         print(f"Chunks embedded: {data['chunks_embedded']}")
+#         print(f"Q: {data['query']}")
+#         print(f"A: {data['answer'][:400]}")
+#     else:
+#         print(f"ERROR {resp.status_code}: {resp.text}")
 
 # Error-case test: fake company should return 404
 # print("\n--- XYZ123FAKE (expect 404) ---")
@@ -80,8 +80,35 @@ for company, query in [
 # print(f"Detail     : {resp.json().get('detail', resp.text)}")
 
 
-resp = requests.post(f"{BASE}/research", json={"company_name": "sfshffdsdfjjk3453", "query": "What does sfshffdsdfjjk3453 do?"})
-print(f"Status code: {resp.status_code}")
-print(f"Detail     : {resp.json().get('detail', resp.text)}")
+# resp = requests.post(f"{BASE}/research", json={"company_name": "sfshffdsdfjjk3453", "query": "What does sfshffdsdfjjk3453 do?"})
+# print(f"Status code: {resp.status_code}")
+# print(f"Detail     : {resp.json().get('detail', resp.text)}")
+
+
+
+
+# Phase 3
+
+# from backend.agents.research_graph import ResearchState
+# state = ResearchState(company_name="Claude", news_results=[], culture_results=[], tech_results=[], interview_results=[], all_results=[])
+# print(state['company_name'])
+
+
+# from backend.agents.research_graph import news_node
+# state = {"company_name": "Tesla", "news_results": []}
+# new_state = news_node(state)
+# print(len(new_state['news_results']))
+# print(new_state['news_results'])
+
+
+# from backend.agents.research_graph import aggregator_node
+# state = {"news_results": [{"title": "a"}], "culture_results": [{"title": "b"}], "tech_results": [], "interview_results": [], "all_results": []}
+# new_state = aggregator_node(state)
+# print(len(new_state['all_results']))
+
+# from backend.agents.research_graph import build_graph
+# app = build_graph()
+# result = app.invoke({"company_name": "Tesla", "news_results": [], "culture_results": [], "tech_results": [], "interview_results": [], "all_results": []})
+# print(len(result['all_results']))
 
 
