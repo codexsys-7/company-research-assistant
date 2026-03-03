@@ -80,6 +80,16 @@ focus on developer experience.
 - Tested: OpenAI (20 sources, 20 chunks), Airbnb (20 sources, 20 chunks) - both returning live answers
 -->
 
+<!-- **Phase 4:** Structured Reports (Day 4) COMPLETED Mar 2, 2026
+- CompanyReport Pydantic schema: 11 fields (overview, tech_stack, culture_and_values, recent_news, financials, interview_process, common_interview_questions, red_flags, preparation_tips)
+- report_generator_node added to LangGraph graph (sequential after aggregator); uses all_context fallback since ChromaDB is empty when graph runs
+- /generate-report endpoint: clear → research_graph.invoke() → embed → return report.model_dump()
+- /chat endpoint: validate ChromaDB.count() > 0 → retrieve_context(k=3) → answer_query → return answer
+- Schema validators added: filter_sentinel_strings (tech_stack, red_flags, common_interview_questions), limit_and_filter_recent_news (max 5 items)
+- Prompt improvements: explicit "list fields must return [] not 'Information not available'", field-specific guidance for tech_stack/recent_news/common_interview_questions/red_flags
+- Tested: Airbnb, Uber, Shopify (20 sources, 11/11 fields populated), Brafton (small company edge case - graceful fallback)
+-->
+
 <!-- **Phase 3:** LangGraph Agents (Day 3) COMPLETED Feb 26, 2026
 - ResearchState TypedDict: company_name, news_results, culture_results, tech_results, interview_results, all_results
 - 4 sequential nodes: news_node → culture_node → tech_node → interview_node → aggregator_node
@@ -125,12 +135,11 @@ focus on developer experience.
 
 **Phase 3:** LangGraph Agents — COMPLETED Feb 26, 2026
 
+**Phase 4:** Structured Reports — COMPLETED Mar 2, 2026
+
 ## 🔄 Current Phase
 
-**Phase 4:** Structured Reports (Feb 27, 2026)
+**Phase 5:** React Frontend (Day 5)
 
-**Next immediate steps:**
-
-- Create `backend/schemas/report.py` — Pydantic models for structured report output
-- Create `/generate-report` endpoint in `main.py`
-- Create `/chat` endpoint in `main.py` for follow-up RAG queries
+- SearchBar, ReportView, ChatInterface components
+- Full UI flow: company name input → report display → follow-up chat
