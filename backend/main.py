@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from rag.embeddings import clear_collection, embed_search_results
+from rag.embeddings import clear_collection, embed_search_results, get_collection
 from rag.retriever import retrieve_context
 from chains.report_chain import answer_query
 from agents.research_graph import build_graph
@@ -25,6 +25,15 @@ app.add_middleware(
 class ResearchRequest(BaseModel):
     company_name: str
     query: str
+
+
+class GenerateReportRequest(BaseModel):
+    company_name: str
+
+
+class ChatRequest(BaseModel):
+    company_name: str
+    question: str
 
 
 @app.get("/")
@@ -59,6 +68,7 @@ def research(request: ResearchRequest):
             "culture_results": [],
             "tech_results": [],
             "interview_results": [],
+            "financials_results": [],
             "all_results": [],
         }
         final_state = research_graph.invoke(initial_state)
@@ -107,4 +117,96 @@ def research(request: ResearchRequest):
         "sources_found": len(search_texts),
         "chunks_embedded": chunks_embedded,
         "execution_time_s": elapsed,
+    }
+
+
+@app.post("/generate-report")
+def generate_report_endpoint(request: GenerateReportRequest):
+    start_time = time.time()
+
+    # 1. Clear stale data
+    try:
+        clear_collection()
+    except Exception as e:
+        logger.error("ChromaDB clear failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Vector store error: {e}")
+
+    # 2. Run LangGraph agent (news → culture → tech → interview → aggregator → report_generator)
+    try:
+        initial_state = {
+            "company_name": request.company_name,
+            "news_results": [],
+            "culture_results": [],
+            "tech_results": [],
+            "interview_results": [],
+            "financials_results": [],
+            "all_results": [],
+            "report": None,
+        }
+        final_state = research_graph.invoke(initial_state)
+        search_texts = final_state["all_results"]
+    except Exception as e:
+        logger.error("Agent graph failed for '%s': %s", request.company_name, e)
+        raise HTTPException(status_code=503, detail=f"Research agent error: {e}")
+
+    if not search_texts:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No web results found for '{request.company_name}'. Check the company name and try again.",
+        )
+
+    # 3. Embed results into ChromaDB (for follow-up /chat queries)
+    try:
+        embed_search_results(request.company_name, search_texts)
+    except Exception as e:
+        logger.error("ChromaDB embed failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Vector store error: {e}")
+
+    # 4. Return structured report
+    report = final_state.get("report")
+    if report is None:
+        raise HTTPException(status_code=500, detail="Report generation failed — no report in agent state.")
+
+    elapsed = round(time.time() - start_time, 2)
+
+    return {
+        "status": "ok",
+        "company": request.company_name,
+        "sources_found": len(search_texts),
+        "execution_time_s": elapsed,
+        "report": report.model_dump(),
+    }
+
+
+@app.post("/chat")
+def chat(request: ChatRequest):
+    # 1. Validate that research data exists in ChromaDB
+    if get_collection().count() == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No research data found for '{request.company_name}'. Call /generate-report first.",
+        )
+
+    # 2. Retrieve relevant context for the question
+    try:
+        context = retrieve_context(request.question, k=3)
+    except Exception as e:
+        logger.error("ChromaDB retrieval failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Vector store error: {e}")
+
+    if not context:
+        raise HTTPException(status_code=404, detail="No relevant context found for this question.")
+
+    # 3. Generate answer from context
+    try:
+        answer = answer_query(request.question, context)
+    except Exception as e:
+        logger.error("LLM call failed: %s", e)
+        raise HTTPException(status_code=503, detail=f"LLM error: {e}")
+
+    return {
+        "status": "ok",
+        "company": request.company_name,
+        "question": request.question,
+        "answer": answer,
     }

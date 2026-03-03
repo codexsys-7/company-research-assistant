@@ -112,3 +112,25 @@
 # print(len(result['all_results']))
 
 
+
+#phase 4
+
+# from backend.schemas.report import CompanyReport
+# report = CompanyReport(company_name="Tesla", overview="Electric vehicles", products_and_services="Cars", tech_stack=["Python"], culture_and_values="Innovation", recent_news=["News"], financials="$800B", interview_process="3 rounds", common_interview_questions=["Why Tesla?"], red_flags=[], preparation_tips="Research")
+# print(report.model_dump_json(indent=2))
+
+
+# from backend.rag.retriever import retrieve_context
+# from backend.chains.report_generator import generate_report
+# context = retrieve_context("Tesla", k=20)
+# report = generate_report("Tesla", context)
+# print(type(report), report.company_name)
+# print(report, report.company_name)
+
+
+# from backend.agents.research_graph import build_graph
+# app = build_graph()
+# result = app.invoke({"company_name": "OpenAI", "news_results": [], "culture_results": [], "tech_results": [], "interview_results": [], "all_results": [], "report": None})
+# print(result['report'].company_name)
+
+
