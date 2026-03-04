@@ -205,12 +205,17 @@ def chat(request: ChatRequest):
 
     # 2. Validate that research data exists in ChromaDB
     if get_collection().count() == 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No research data found for '{request.company_name}'. Call /generate-report first.",
-        )
+        return {
+            "status": "ok",
+            "company": request.company_name,
+            "question": request.question,
+            "answer": (
+                f"My research session for {request.company_name} has expired (the server restarted). "
+                f"Please go back and run a new search to reload the data, then ask again."
+            ),
+        }
 
-    # 2. Retrieve relevant context for the question
+    # 3. Retrieve relevant context for the question
     try:
         context = retrieve_context(request.question, k=3, company_name=request.company_name)
     except Exception as e:
@@ -219,22 +224,6 @@ def chat(request: ChatRequest):
 
     if not context:
         raise HTTPException(status_code=404, detail="No relevant context found for this question.")
-
-    # 3. Guard: if none of the retrieved chunks mention the company, the context
-    #    is about a different company — return a graceful no-data reply directly
-    #    instead of letting the LLM hallucinate from unrelated snippets.
-    company_lower = request.company_name.lower()
-    if len(company_lower) >= 3 and not any(company_lower in chunk.lower() for chunk in context):
-        return {
-            "status": "ok",
-            "company": request.company_name,
-            "question": request.question,
-            "answer": (
-                f"I don't have specific information about {request.company_name} on this topic "
-                f"from my research data. The web search results didn't return relevant details "
-                f"about this company for your question."
-            ),
-        }
 
     # 4. Generate answer from context
     try:
