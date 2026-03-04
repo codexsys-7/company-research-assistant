@@ -1,84 +1,60 @@
-from ddgs import DDGS
-from ddgs.exceptions import DDGSException
+import os
+from tavily import TavilyClient
+from dotenv import load_dotenv
+
+load_dotenv()
+
+_client = TavilyClient(api_key=os.getenv("TAVILY"))
 
 
-def search_web(query: str, max_results: int = 10, timelimit: str | None = None) -> list[dict]:
+def search_web(query: str, max_results: int = 5) -> list[dict]:
     """
-    Search the web using DuckDuckGo.
-
-    Args:
-        query: Search query string.
-        max_results: Maximum number of results to return.
-        timelimit: Restrict results by age — 'd' (day), 'w' (week), 'm' (month), 'y' (year).
-                   None means no restriction.
-
+    Search the web using Tavily.
     Returns a list of dicts with keys: title, snippet, url.
     Returns an empty list on any error.
     """
-    results = []
     try:
-        with DDGS(timeout=15) as ddgs:
-            for r in ddgs.text(query, max_results=max_results, timelimit=timelimit):
-                results.append({
-                    "title": r.get("title", ""),
-                    "snippet": r.get("body", ""),
-                    "url": r.get("href", ""),
-                })
-    except DDGSException as e:
-        print(f"[duckduckgo_client] Search error for '{query}': {e}")
+        response = _client.search(query, max_results=max_results)
+        results = []
+        for r in response.get("results", []):
+            results.append({
+                "title": r.get("title", ""),
+                "snippet": r.get("content", ""),
+                "url": r.get("url", ""),
+            })
+        return results
     except Exception as e:
-        print(f"[duckduckgo_client] Unexpected error for '{query}': {e}")
-    return results
-
-
-def _search_recent(query: str, max_results: int) -> list[dict]:
-    """Try past-year results first; fall back to all-time if none returned."""
-    results = search_web(query, max_results=max_results, timelimit="y")
-    if not results:
-        results = search_web(query, max_results=max_results)
-    return results
+        print(f"[search_web] Error for '{query}': {e}")
+        return []
 
 
 def search_news(company: str) -> list[dict]:
-    return _search_recent(f"{company} latest news", max_results=5)
+    return search_web(f"{company} latest news", max_results=5)
 
 
 def search_culture(company: str) -> list[dict]:
-    return _search_recent(f"{company} company culture values employees", max_results=5)
+    return search_web(f"{company} company culture values employees", max_results=5)
 
 
 def search_tech(company: str) -> list[dict]:
-    return _search_recent(f"{company} tech stack engineering technology", max_results=5)
+    return search_web(f"{company} tech stack engineering technology", max_results=5)
 
 
 def search_financials(company: str) -> list[dict]:
-    revenue = _search_recent(
-        f"{company} annual revenue earnings financial results",
-        max_results=3,
-    )
-    valuation = _search_recent(
-        f"{company} market cap valuation stock price funding crunchbase",
-        max_results=3,
-    )
+    revenue = search_web(f"{company} annual revenue earnings financial results", max_results=3)
+    valuation = search_web(f"{company} market cap valuation stock price funding", max_results=3)
     return revenue + valuation
 
 
 def search_interviews(company: str) -> list[dict]:
-    glassdoor = _search_recent(
-        f"{company} interview questions Glassdoor candidate experience",
-        max_results=3,
-    )
-    leetcode = _search_recent(
-        f"site:leetcode.com {company} interview questions experience",
-        max_results=3,
-    )
+    glassdoor = search_web(f"{company} interview questions Glassdoor candidate experience", max_results=3)
+    leetcode = search_web(f"site:leetcode.com {company} interview questions experience", max_results=3)
     return glassdoor + leetcode
 
 
 def process_results(results: list[dict]) -> list[str]:
     """
     Deduplicate by URL, clean whitespace, and combine title + snippet into text chunks.
-
     Returns a list of strings ready for embedding.
     """
     seen_urls = set()
@@ -97,9 +73,7 @@ def process_results(results: list[dict]) -> list[str]:
 
 
 def search_company(company_name: str) -> list[dict]:
-    """
-    Run all research queries for a company and return combined results.
-    """
+    """Run all research queries for a company and return combined results."""
     results = []
     results.extend(search_news(company_name))
     results.extend(search_culture(company_name))
