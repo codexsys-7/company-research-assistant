@@ -80,16 +80,6 @@ focus on developer experience.
 - Tested: OpenAI (20 sources, 20 chunks), Airbnb (20 sources, 20 chunks) - both returning live answers
 -->
 
-<!-- **Phase 4:** Structured Reports (Day 4) COMPLETED Mar 2, 2026
-- CompanyReport Pydantic schema: 11 fields (overview, tech_stack, culture_and_values, recent_news, financials, interview_process, common_interview_questions, red_flags, preparation_tips)
-- report_generator_node added to LangGraph graph (sequential after aggregator); uses all_context fallback since ChromaDB is empty when graph runs
-- /generate-report endpoint: clear → research_graph.invoke() → embed → return report.model_dump()
-- /chat endpoint: validate ChromaDB.count() > 0 → retrieve_context(k=3) → answer_query → return answer
-- Schema validators added: filter_sentinel_strings (tech_stack, red_flags, common_interview_questions), limit_and_filter_recent_news (max 5 items)
-- Prompt improvements: explicit "list fields must return [] not 'Information not available'", field-specific guidance for tech_stack/recent_news/common_interview_questions/red_flags
-- Tested: Airbnb, Uber, Shopify (20 sources, 11/11 fields populated), Brafton (small company edge case - graceful fallback)
--->
-
 <!-- **Phase 3:** LangGraph Agents (Day 3) COMPLETED Feb 26, 2026
 - ResearchState TypedDict: company_name, news_results, culture_results, tech_results, interview_results, all_results
 - 4 sequential nodes: news_node → culture_node → tech_node → interview_node → aggregator_node
@@ -103,17 +93,33 @@ focus on developer experience.
 - Fake company test (qwertrewq): DuckDuckGo returns unrelated results; LLM correctly says no info found
 -->
 
-**Phase 4:** Structured Reports (Day 4)
+<!-- **Phase 4:** Structured Reports (Day 4) COMPLETED Mar 2, 2026
+- CompanyReport Pydantic schema: 11 fields (overview, tech_stack, culture_and_values, recent_news, financials, interview_process, common_interview_questions, red_flags, preparation_tips)
+- report_generator_node added to LangGraph graph (sequential after aggregator); uses all_context fallback since ChromaDB is empty when graph runs
+- /generate-report endpoint: clear → research_graph.invoke() → embed → return report.model_dump()
+- /chat endpoint: validate ChromaDB.count() > 0 → retrieve_context(k=3) → answer_query → return answer
+- Schema validators added: filter_sentinel_strings (tech_stack, red_flags, common_interview_questions), limit_and_filter_recent_news (max 5 items)
+- Prompt improvements: explicit "list fields must return [] not 'Information not available'", field-specific guidance for tech_stack/recent_news/common_interview_questions/red_flags
+- Tested: Airbnb, Uber, Shopify (20 sources, 11/11 fields populated), Brafton (small company edge case - graceful fallback)
+-->
 
-- Pydantic report schema (`backend/schemas/report.py`)
-- `/generate-report` endpoint: takes company_name, runs research graph, returns structured JSON report
-- Report sections: summary, tech_stack, culture, interview_tips, recent_news
-- `/chat` endpoint: takes company_name + question, retrieves from ChromaDB, returns RAG answer
-
-**Phase 5:** React Frontend (Day 5)
-
+<!-- **Phase 5:** React Frontend (Day 5) COMPLETED Mar 4, 2026
+- Vite 7 + React 19 + Tailwind CSS v3 scaffold (downgraded from v4 — dropped tailwind.config.js)
 - SearchBar, ReportView, ChatInterface components
-- Full UI flow
+- Full UI flow: company name input → structured report display → follow-up chat
+- LoadingScreen: ring spinner, 6 stage messages cycling every 8s, 60s countdown, progress bar, ReportSkeleton preview
+- ReportView: max-w-4xl, responsive 2-col grid on md+ for paired sections; full-width for Overview/News/Questions
+- Custom favicon.svg (magnifying glass on blue square) + meta tags in public/
+- api.js: Axios instance with VITE_API_URL env var; generateReport() + chat() helpers
+- Vite proxy: /api/* → localhost:8000 (dev only, strips /api prefix — avoids CORS in dev)
+- CORS: backend allows localhost:5173 + *.onrender.com regex
+- .env (dev): VITE_API_URL= (empty, uses proxy); .env.production: VITE_API_URL=https://your-backend.onrender.com
+- .env.example created; .env and .env.production gitignored
+- Production build tested: npm run build → dist/ (253 kB JS, 26 kB CSS); npm run preview → port 4173
+- Fake company protection: is_real_company LLM check + WHERE filter in retriever + context relevance guard
+- Hallucination bug fixed: killed zombie server processes (taskkill /F /IM python.exe /T); retriever except → return []
+- Cold start timeout: frontend handles slow Render cold starts gracefully via LoadingScreen countdown
+-->
 
 **Phase 6:** Docker + Testing (Day 6)
 
@@ -137,9 +143,12 @@ focus on developer experience.
 
 **Phase 4:** Structured Reports — COMPLETED Mar 2, 2026
 
+**Phase 5:** React Frontend — COMPLETED Mar 4, 2026
+
 ## 🔄 Current Phase
 
-**Phase 5:** React Frontend (Day 5)
+**Phase 6:** Docker + Testing (Day 6)
 
-- SearchBar, ReportView, ChatInterface components
-- Full UI flow: company name input → report display → follow-up chat
+- Docker Compose setup (backend + frontend services)
+- End-to-end testing
+- Bug fixes

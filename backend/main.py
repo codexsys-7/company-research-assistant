@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from rag.embeddings import clear_collection, embed_search_results, get_collection
 from rag.retriever import retrieve_context
-from chains.report_chain import answer_query
+from chains.report_chain import answer_query, is_real_company
 from agents.research_graph import build_graph
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,9 @@ app = FastAPI(title="Company Research Assistant")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"https://.*\.onrender\.com",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -167,6 +169,15 @@ def generate_report_endpoint(request: GenerateReportRequest):
     if report is None:
         raise HTTPException(status_code=500, detail="Report generation failed — no report in agent state.")
 
+    # Detect fake / unrecognised company: overview is the strongest signal
+    _SENTINEL = {"not available", "information not available", "no information", "no data"}
+    overview_lower = (report.overview or "").lower()
+    if not report.overview or any(s in overview_lower for s in _SENTINEL):
+        raise HTTPException(
+            status_code=404,
+            detail=f"No reliable information found for '{request.company_name}'. Please check the company name and try again.",
+        )
+
     elapsed = round(time.time() - start_time, 2)
 
     return {
@@ -180,7 +191,19 @@ def generate_report_endpoint(request: GenerateReportRequest):
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    # 1. Validate that research data exists in ChromaDB
+    # 1. Validate the company is real before doing anything else
+    if not is_real_company(request.company_name):
+        return {
+            "status": "ok",
+            "company": request.company_name,
+            "question": request.question,
+            "answer": (
+                f"'{request.company_name}' does not appear to be a real company. "
+                f"Please go back and search for a valid company name."
+            ),
+        }
+
+    # 2. Validate that research data exists in ChromaDB
     if get_collection().count() == 0:
         raise HTTPException(
             status_code=400,
@@ -189,7 +212,7 @@ def chat(request: ChatRequest):
 
     # 2. Retrieve relevant context for the question
     try:
-        context = retrieve_context(request.question, k=3)
+        context = retrieve_context(request.question, k=3, company_name=request.company_name)
     except Exception as e:
         logger.error("ChromaDB retrieval failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Vector store error: {e}")
@@ -197,9 +220,25 @@ def chat(request: ChatRequest):
     if not context:
         raise HTTPException(status_code=404, detail="No relevant context found for this question.")
 
-    # 3. Generate answer from context
+    # 3. Guard: if none of the retrieved chunks mention the company, the context
+    #    is about a different company — return a graceful no-data reply directly
+    #    instead of letting the LLM hallucinate from unrelated snippets.
+    company_lower = request.company_name.lower()
+    if len(company_lower) >= 3 and not any(company_lower in chunk.lower() for chunk in context):
+        return {
+            "status": "ok",
+            "company": request.company_name,
+            "question": request.question,
+            "answer": (
+                f"I don't have specific information about {request.company_name} on this topic "
+                f"from my research data. The web search results didn't return relevant details "
+                f"about this company for your question."
+            ),
+        }
+
+    # 4. Generate answer from context
     try:
-        answer = answer_query(request.question, context)
+        answer = answer_query(request.question, context, company_name=request.company_name)
     except Exception as e:
         logger.error("LLM call failed: %s", e)
         raise HTTPException(status_code=503, detail=f"LLM error: {e}")
