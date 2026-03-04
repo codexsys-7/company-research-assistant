@@ -7,7 +7,7 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
-      - key: HF_TOKEN
+      - key: TAVILY
         sync: false
       - key: CHROMA_PERSIST_DIR
         value: ./chroma_db
