@@ -335,7 +335,7 @@ company-research-assistant/
 
 Built by **AB** — open to feedback, issues, and pull requests.
 
-- GitHub Issues: [github.com/your-username/company-research-assistant/issues](https://github.com/your-username/company-research-assistant/issues)
+- GitHub Issues: [github.com/codexsys-7/company-research-assistant/issues](https://github.com/codexsys-7/company-research-assistant/issues)
 
 ---
 
