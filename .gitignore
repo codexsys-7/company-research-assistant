@@ -139,6 +139,7 @@ chroma_db/
 
 # Environments
 .env
+.env.production
 .envrc
 .venv
 env/
