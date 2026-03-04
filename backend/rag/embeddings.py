@@ -39,7 +39,7 @@ if sys.version_info >= (3, 14):
 
 from dotenv import load_dotenv
 import chromadb
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../.env"), override=True)
 
@@ -60,8 +60,9 @@ def get_collection() -> chromadb.Collection:
     global _collection
     if _collection is None:
         client = _get_client()
-        embedding_fn = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
+        embedding_fn = OpenAIEmbeddingFunction(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model_name="text-embedding-3-small",
         )
         _collection = client.get_or_create_collection(
             name="company_data",
